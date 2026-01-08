@@ -1,0 +1,5 @@
+# Prometheus scrape targets configuration
+
+# TODO: Add service discovery configurations
+# TODO: Configure static targets
+# TODO: Set up Kubernetes service discovery

@@ -1,0 +1,16 @@
+groups:
+  - name: system_alerts
+    interval: 1m
+    rules:
+      # TODO: Define system-level alert rules
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+        for: 5m
+        annotations:
+          summary: "Pod is crash looping"
+
+      - alert: NodeNotReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 5m
+        annotations:
+          summary: "Kubernetes node is not ready"

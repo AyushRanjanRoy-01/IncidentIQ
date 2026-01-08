@@ -1,0 +1,21 @@
+# Code owners for AI-SRE Platform
+
+# Backend
+/backend/ @ai-sre-backend-team
+
+# Frontend
+/frontend/ @ai-sre-frontend-team
+
+# Infrastructure
+/infra/ @ai-sre-infra-team
+
+# Documentation
+/docs/ @ai-sre-team
+
+# CI/CD
+/.github/ @ai-sre-team
+
+# Root config files
+/Makefile @ai-sre-team
+/docker-compose.yml @ai-sre-team
+/.env.example @ai-sre-team

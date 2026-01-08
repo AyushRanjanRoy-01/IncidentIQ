@@ -1,0 +1,23 @@
+# Anomaly detection alert rules
+
+groups:
+  - name: anomaly_detection
+    interval: 30s
+    rules:
+      - alert: HighAnomalyScore
+        expr: anomaly_score > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High anomaly score detected"
+          description: "Anomaly score {{ $value }} exceeds threshold"
+
+      - alert: MultipleAnomalies
+        expr: count(anomaly_score > 0.7) > 5
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Multiple anomalies detected"
+          description: "{{ $value }} anomalies detected across services"

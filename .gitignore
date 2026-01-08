@@ -1,0 +1,109 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+build/
+.cache/
+.parcel-cache/
+.next/
+out/
+.turbo/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-*
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.envrc
+.envrc
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Kubernetes
+*.kubeconfig
+kubeconfig
+
+# Docker
+.dockerignore
+
+# Logs
+logs/
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+*.DS_Store
+
+# Database
+*.sqlite3
+*.db
+
+# Secrets (CRITICAL)
+*secret*
+*credentials*
+*.pem
+*.key
+*.crt
+*token*
+id_rsa*
+id_ed25519*
+
+# Project specific
+data/temp/
+data/cache/
+backend/data/temp/
+backend/data/cache/

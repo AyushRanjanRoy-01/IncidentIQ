@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai-sre-platform
+  labels:
+    name: ai-sre-platform
+    environment: base

@@ -1,0 +1,157 @@
+openapi: 3.0.3
+info:
+  title: AI-SRE Platform API
+  description: API for AI-powered SRE platform
+  version: 0.1.0
+  contact:
+    name: AI-SRE Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://api.ai-sre-platform.com
+    description: Production
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+
+  /api/v1/alerts:
+    get:
+      summary: List alerts
+      tags:
+        - Alerts
+      responses:
+        '200':
+          description: List of alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Alert'
+    
+    post:
+      summary: Create alert
+      tags:
+        - Alerts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Alert'
+      responses:
+        '201':
+          description: Alert created
+
+  /api/v1/incidents:
+    get:
+      summary: List incidents
+      tags:
+        - Incidents
+      responses:
+        '200':
+          description: List of incidents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Incident'
+
+  /api/v1/remediations:
+    post:
+      summary: Create remediation
+      tags:
+        - Remediations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Remediation'
+      responses:
+        '201':
+          description: Remediation created
+
+components:
+  schemas:
+    Alert:
+      type: object
+      properties:
+        alert_id:
+          type: string
+        severity:
+          type: string
+          enum: [critical, warning, info]
+        service:
+          type: string
+        metric:
+          type: string
+        value:
+          type: number
+        threshold:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+
+    Incident:
+      type: object
+      properties:
+        incident_id:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [open, investigating, resolved, closed]
+        severity:
+          type: string
+        service:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Remediation:
+      type: object
+      properties:
+        remediation_id:
+          type: string
+        incident_id:
+          type: string
+        action_type:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []

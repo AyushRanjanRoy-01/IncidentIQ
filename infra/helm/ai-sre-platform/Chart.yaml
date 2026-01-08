@@ -1,0 +1,24 @@
+apiVersion: v2
+name: ai-sre-platform
+description: AI-SRE Platform Helm chart
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - sre
+  - ai
+  - observability
+  - incident-management
+
+maintainers:
+  - name: AI-SRE Team
+
+dependencies:
+  - name: postgresql
+    version: "~12.0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+  - name: redis
+    version: "~18.0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled

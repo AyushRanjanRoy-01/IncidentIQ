@@ -1,0 +1,60 @@
+{
+  "alerts": [
+    {
+      "alert_id": "alert-001",
+      "severity": "critical",
+      "service": "checkout-api",
+      "metric": "api_latency_p95",
+      "value": 2500,
+      "threshold": 1000,
+      "timestamp": "2024-01-09T10:30:00Z",
+      "labels": {
+        "env": "production",
+        "cluster": "us-west-2",
+        "pod": "checkout-api-7d8f9c4b-2x5k9"
+      }
+    },
+    {
+      "alert_id": "alert-002",
+      "severity": "warning",
+      "service": "payment-api",
+      "metric": "error_rate",
+      "value": 0.025,
+      "threshold": 0.01,
+      "timestamp": "2024-01-09T10:32:00Z",
+      "labels": {
+        "env": "production",
+        "cluster": "us-west-2",
+        "pod": "payment-api-9a3b2c1d-4m7n8"
+      }
+    },
+    {
+      "alert_id": "alert-003",
+      "severity": "critical",
+      "service": "user-api",
+      "metric": "memory_usage",
+      "value": 92,
+      "threshold": 85,
+      "timestamp": "2024-01-09T10:35:00Z",
+      "labels": {
+        "env": "production",
+        "cluster": "us-east-1",
+        "pod": "user-api-5e6f7g8h-1p2q3"
+      }
+    },
+    {
+      "alert_id": "alert-004",
+      "severity": "warning",
+      "service": "inventory-api",
+      "metric": "cpu_usage",
+      "value": 78,
+      "threshold": 75,
+      "timestamp": "2024-01-09T10:40:00Z",
+      "labels": {
+        "env": "staging",
+        "cluster": "us-west-2",
+        "pod": "inventory-api-3c4d5e6f-9r0s1"
+      }
+    }
+  ]
+}

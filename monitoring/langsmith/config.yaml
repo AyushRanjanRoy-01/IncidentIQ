@@ -1,0 +1,21 @@
+# LangSmith configuration for LLM observability
+
+api_key: ${LANGSMITH_API_KEY}
+project: ${LANGSMITH_PROJECT:-ai-sre-platform}
+environment: ${ENVIRONMENT:-development}
+
+# Tracing configuration
+tracing:
+  enabled: true
+  sample_rate: 1.0  # 100% sampling in development, adjust for production
+
+# Cost tracking
+cost_tracking:
+  enabled: true
+  track_tokens: true
+  track_requests: true
+
+# Feedback collection
+feedback:
+  enabled: true
+  allow_anonymous: false

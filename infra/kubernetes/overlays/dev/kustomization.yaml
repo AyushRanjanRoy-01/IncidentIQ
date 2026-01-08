@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ai-sre
+
+resources:
+- ../base/namespace.yaml
+- ../base/backend/deployment.yaml
+- ../base/backend/service.yaml
+- ../base/backend/configmap.yaml
+- ../base/workers/deployment.yaml
+- ../base/prometheus/deployment.yaml
+- ../base/prometheus/service.yaml
+- ../base/prometheus/configmap.yaml
+- ../base/frontend/deployment.yaml
+- ../base/frontend/service.yaml
+- ../base/ingress.yaml
+
+# TODO: Add kustomize patches for dev environment
+# TODO: Configure image tags, replicas, resource limits
