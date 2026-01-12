@@ -37,7 +37,7 @@ sentence-transformers==2.2.2
 
 # Kubernetes
 kubernetes==29.0.0
-kopf==1.36.4
+kopf==1.37.0
 
 # Terraform
 python-terraform==0.10.1
