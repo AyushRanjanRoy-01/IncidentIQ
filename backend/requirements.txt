@@ -24,7 +24,7 @@ dramatiq==1.14.2
 # Agent & LLM (placeholders)
 langchain==0.1.0
 langgraph==0.0.11
-langsmith==0.1.0
+# langsmith==0.1.0
 openai==1.3.0
 anthropic==0.7.0
 
