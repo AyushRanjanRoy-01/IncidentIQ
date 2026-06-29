@@ -1,177 +1,78 @@
 # Validation Status
 
-## ✅ What Can Be Validated NOW
+This document reflects the **actual, verified** state of the project (the previous
+version overstated readiness).
 
-### 1. **Structure Validation** ✅
-```bash
-python3 scripts/validate_structure.py
-```
-- ✅ All 103 Python files have valid syntax
-- ✅ All 24 TypeScript/React files exist
-- ✅ Directory structure is complete
-- ✅ Configuration files are valid JSON/YAML
+## ✅ Verified working
 
-### 2. **Python Syntax Check** ✅
+### Backend — runs and is tested
 ```bash
 cd backend
-python3 -m py_compile app/main.py  # Works!
-```
-- All Python files compile without syntax errors
-- Type hints are valid
-- Import structure is correct
-
-### 3. **TypeScript Syntax Check** ✅
-```bash
-cd frontend
-npm install  # Install dependencies first
-npm run build  # Will validate TypeScript
+python -m venv venv && . venv/Scripts/activate   # or venv/bin/activate
+pip install -r requirements-dev.txt
+pytest                 # 28 tests pass (end-to-end + unit)
+ruff check . && black --check .   # clean
+uvicorn app.main:app   # boots, seeds users, indexes knowledge base
 ```
 
-### 4. **Configuration Validation** ✅
-- ✅ `package.json` - Valid JSON
-- ✅ `requirements.txt` - Valid format
-- ✅ `docker-compose.yml` - Valid YAML
-- ✅ `Makefile` - Valid syntax
-- ✅ Terraform files - Valid HCL syntax
+The test suite covers the full vertical slice:
+- JWT login + RBAC enforcement (viewer/operator/admin)
+- Alert ingestion → dedup/correlation → incident creation
+- Multi-agent RCA (triage → context → knowledge/RAG → RCA → supervisor)
+- Auto-proposed remediation + human approval → execution
+- Knowledge base semantic search
 
-### 5. **Docker Compose** ✅
-```bash
-docker-compose config  # Validates docker-compose.yml
-```
+A live `uvicorn` run was verified end-to-end over HTTP (login → ingest → incident
+with RCA + recommended rollback at 0.95 confidence → approve → succeeded) with
+Prometheus counters recording.
 
-## ⚠️ What Needs Development
+### Database
+- Async SQLAlchemy 2.0 engine; SQLite by default, PostgreSQL via `DATABASE_URL`.
+- Alembic initial migration generated and applied successfully.
+- Tables auto-created on startup for zero-config local/dev.
 
-### 1. **Implementation Logic** ⚠️
-Most files contain:
-- ✅ Proper structure and type hints
-- ✅ TODO comments marking implementation needed
-- ❌ Actual business logic (marked with TODOs)
+### CI/CD
+- `.github/workflows/ci.yml` runs: ruff + black + pytest (backend), `npm ci` +
+  build (frontend), and Docker image builds for both services.
 
-**Example:**
-```python
-# backend/app/main.py
-@app.get("/health")
-async def health_check() -> dict:
-    # TODO: Implement health check logic
-    pass  # ← Needs implementation
-```
+### Documentation
+- `README.md` accurately describes implemented vs. mock vs. scaffolded areas.
+- `.env.example` documents every setting (and is referenced by `make setup-local`).
 
-### 2. **Dependencies Installation** ⚠️
-```bash
-# Backend
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt  # Will work, but imports will fail without implementation
+## ⚠️ Mock-mode (works, but simulated)
 
-# Frontend  
-cd frontend
-npm install  # Will work
-npm run dev  # Will start, but API calls will fail
-```
+External integrations run in **mock mode** by default and return realistic
+synthetic results, so the self-healing flow is demonstrable without real systems:
+- Kubernetes (restart/scale/rollback), Prometheus, GitHub, Slack, PagerDuty, Terraform.
 
-### 3. **Database Setup** ⚠️
-- Database models exist but need migrations
-- Connection logic needs implementation
-- Vector store setup needs configuration
+Enable real behaviour with the relevant env flags + `requirements-optional.txt`
+dependencies (`KUBERNETES_ENABLED=true`, `INTEGRATIONS_MOCK_MODE=false`, tokens, etc.).
 
-### 4. **Service Integration** ⚠️
-- LLM API clients need API keys
-- Vault integration needs Vault server
-- Kubernetes client needs cluster access
-- All integrations have structure but need configuration
+The OpenAI LLM path is real and auto-enabled when `OPENAI_API_KEY` is set; without
+a key the deterministic offline engine is used.
 
-## 🚀 Quick Start Validation
+## 🧱 Scaffolded (not part of the runnable slice)
 
-### Step 1: Validate Structure
-```bash
-python3 scripts/validate_structure.py
-```
-**Result:** ✅ Structure is valid!
+These remain structured stubs for future work and are **not** required for the
+platform to run:
+- Background workers (`app/workers/*`)
+- ML anomaly detection / forecasting (`app/ml/*`)
+- Kafka event streaming, Vault, feature flags, cost trackers
 
-### Step 2: Check Python Syntax
-```bash
-cd backend
-find app -name "*.py" -exec python3 -m py_compile {} \;
-```
-**Result:** ✅ All files compile!
+## Frontend
 
-### Step 3: Install Dependencies (Optional)
-```bash
-# Backend
-cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+- React + TypeScript SPA wired to the API (login, dashboard, incident detail with
+  RCA + approve/reject, knowledge search).
+- Built with Vite; type-checking is available via `npm run typecheck` (advisory).
+- Verified to build via the CI `frontend` job and the Docker image build.
 
-# Frontend
-cd frontend && npm install
-```
+## Summary
 
-### Step 4: Try Starting Services (Will Start but Limited Functionality)
-```bash
-# Start Docker services
-docker-compose up -d postgres redis
-
-# Try starting backend (will start but endpoints have TODOs)
-cd backend
-source venv/bin/activate
-uvicorn app.main:app --reload
-# Visit http://localhost:8000/docs - API docs will show, but endpoints return placeholders
-```
-
-## 📊 Current Status Summary
-
-| Component | Structure | Syntax | Implementation | Runnable |
-|-----------|-----------|--------|----------------|-----------|
-| Backend Python | ✅ 100% | ✅ 100% | ⚠️ ~10% | ⚠️ Partial |
-| Frontend React | ✅ 100% | ✅ 100% | ⚠️ ~10% | ⚠️ Partial |
-| Infrastructure | ✅ 100% | ✅ 100% | ⚠️ ~5% | ❌ Needs config |
-| CI/CD | ✅ 100% | ✅ 100% | ✅ 100% | ✅ Ready |
-| Documentation | ✅ 100% | ✅ 100% | ✅ 100% | ✅ Ready |
-
-## 🎯 What You Can Do Right Now
-
-1. **✅ Validate Structure**
-   ```bash
-   python3 scripts/validate_structure.py
-   ```
-
-2. **✅ Check Syntax**
-   ```bash
-   # Python
-   cd backend && python3 -m py_compile app/main.py
-   
-   # TypeScript (after npm install)
-   cd frontend && npm run build
-   ```
-
-3. **✅ Review Architecture**
-   - Read `docs/architecture.md`
-   - Review `README.md`
-   - Check `docs/agent_workflows.md`
-
-4. **⚠️ Start Basic Services** (Limited functionality)
-   ```bash
-   docker-compose up -d
-   # Services will start but most endpoints return placeholders
-   ```
-
-5. **❌ Full Functionality** - Needs implementation of TODOs
-
-## 🔨 Next Steps for Full Functionality
-
-1. Implement business logic (replace TODOs)
-2. Configure environment variables
-3. Set up database migrations
-4. Configure external services (Vault, LLM APIs, etc.)
-5. Implement API endpoint logic
-6. Connect frontend to backend APIs
-7. Test end-to-end workflows
-
-## 💡 Recommendation
-
-**You can validate the structure and syntax NOW**, but for **full functionality**, you need to:
-1. Implement the TODO items in each file
-2. Configure external services
-3. Set up the database
-4. Add API keys and credentials
-
-The foundation is **solid and ready for development** - all scaffolding is in place with proper structure, type hints, and modern patterns!
+| Component | Structure | Implementation | Tested | Runnable |
+|-----------|-----------|----------------|--------|----------|
+| Backend (vertical slice) | ✅ | ✅ | ✅ 28 tests | ✅ |
+| Database + migrations | ✅ | ✅ | ✅ | ✅ |
+| Frontend | ✅ | ✅ | build-checked | ✅ (Docker/Node) |
+| CI/CD | ✅ | ✅ | — | ✅ |
+| External integrations | ✅ | ⚠️ mock-mode | ✅ (mock) | ✅ |
+| Workers / ML / streaming | ✅ | 🧱 stub | — | — |

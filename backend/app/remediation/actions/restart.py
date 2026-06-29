@@ -1,37 +1,27 @@
 """Pod restart action."""
 
-from typing import Dict, Any
+from __future__ import annotations
+
+from typing import Any
+
+from app.integrations.kubernetes import KubernetesClient
+
 
 class RestartAction:
-    """Restarts Kubernetes pods."""
-    
-    def __init__(self) -> None:
-        """Initialize restart action."""
-        # TODO: Initialize Kubernetes client
-        pass
-    
-    async def execute(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute restart.
-        
-        Args:
-            parameters: Action parameters including namespace, deployment
-            
-        Returns:
-            Execution result
-        """
-        # TODO: Call Kubernetes client to restart pods
-        # TODO: Return restart status
-        pass
-    
-    async def verify(self, parameters: Dict[str, Any]) -> bool:
-        """Verify restart was successful.
-        
-        Args:
-            parameters: Action parameters
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        # TODO: Check pod status
-        # TODO: Verify metrics improving
-        pass
+    """Performs a rolling restart of a service's pods."""
+
+    action_type = "restart"
+
+    def __init__(self, k8s: KubernetesClient) -> None:
+        self.k8s = k8s
+
+    async def execute(self, target: str, parameters: dict[str, Any]) -> dict[str, Any]:
+        return await self.k8s.restart(
+            service=target,
+            namespace=parameters.get("namespace", "production"),
+            strategy=parameters.get("strategy", "rolling"),
+        )
+
+    async def verify(self, target: str, parameters: dict[str, Any]) -> bool:
+        deployments = await self.k8s.get_deployments(parameters.get("namespace", "production"))
+        return any(d["name"] == target and d["ready"] == d["replicas"] for d in deployments)

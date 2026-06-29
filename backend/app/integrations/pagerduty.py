@@ -1,55 +1,40 @@
-"""PagerDuty integration for incident management."""
+"""PagerDuty integration for incident management (mock-mode by default)."""
 
-from typing import Dict, Any, List, Optional
+from __future__ import annotations
+
+from typing import Any
+
+import structlog
+
+from app.core.config import settings
+
+logger = structlog.get_logger(__name__)
+
 
 class PagerDutyClient:
-    """Client for PagerDuty API."""
-    
-    def __init__(self, api_key: str) -> None:
-        """Initialize PagerDuty client.
-        
-        Args:
-            api_key: PagerDuty API key
-        """
-        self.api_key = api_key
-    
-    async def create_incident(self, title: str, service_id: str, 
-                             urgency: str = "high") -> Dict[str, Any]:
-        """Create a PagerDuty incident.
-        
-        Args:
-            title: Incident title
-            service_id: PagerDuty service ID
-            urgency: Incident urgency (low/high)
-            
-        Returns:
-            Created incident information
-        """
-        # TODO: Create incident via PagerDuty API
-        pass
-    
-    async def resolve_incident(self, incident_id: str, 
-                              resolution_notes: str) -> Dict[str, Any]:
-        """Resolve a PagerDuty incident.
-        
-        Args:
-            incident_id: PagerDuty incident ID
-            resolution_notes: Resolution notes
-            
-        Returns:
-            Updated incident information
-        """
-        # TODO: Resolve incident via PagerDuty API
-        pass
-    
-    async def get_on_call(self, schedule_id: str) -> Dict[str, Any]:
-        """Get on-call user for a schedule.
-        
-        Args:
-            schedule_id: PagerDuty schedule ID
-            
-        Returns:
-            On-call user information
-        """
-        # TODO: Query PagerDuty schedules API
-        pass
+    """Trigger/resolve PagerDuty incidents (mock logs the event)."""
+
+    def __init__(self, api_key: str | None = None, mock: bool | None = None) -> None:
+        self.api_key = api_key or settings.pagerduty_api_key
+        self.mock = settings.integrations_mock_mode if mock is None else mock
+
+    async def trigger(self, summary: str, severity: str = "critical") -> dict[str, Any]:
+        if not self.mock and self.api_key:  # pragma: no cover - requires PagerDuty
+            return await self._real_trigger(summary, severity)
+        logger.info("pagerduty.mock_trigger", summary=summary, severity=severity)
+        return {"status": "triggered", "summary": summary, "severity": severity, "mock": True}
+
+    async def _real_trigger(
+        self, summary: str, severity: str
+    ) -> dict[str, Any]:  # pragma: no cover
+        import httpx
+
+        payload = {
+            "routing_key": self.api_key,
+            "event_action": "trigger",
+            "payload": {"summary": summary, "severity": severity, "source": "IncidentIQ"},
+        }
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post("https://events.pagerduty.com/v2/enqueue", json=payload)
+            resp.raise_for_status()
+            return resp.json()

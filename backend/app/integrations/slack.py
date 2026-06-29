@@ -1,56 +1,37 @@
-"""Slack integration for ChatOps."""
+"""Slack integration for ChatOps (mock-mode by default)."""
 
-from typing import Dict, Any, Optional
+from __future__ import annotations
+
+from typing import Any
+
+import structlog
+
+from app.core.config import settings
+
+logger = structlog.get_logger(__name__)
+
 
 class SlackClient:
-    """Client for Slack API."""
-    
-    def __init__(self, bot_token: str) -> None:
-        """Initialize Slack client.
-        
-        Args:
-            bot_token: Slack bot token
-        """
-        self.bot_token = bot_token
-    
-    async def send_message(self, channel: str, text: str, 
-                          blocks: Optional[list] = None) -> Dict[str, Any]:
-        """Send message to Slack channel.
-        
-        Args:
-            channel: Channel name or ID
-            text: Message text
-            blocks: Optional block kit blocks
-            
-        Returns:
-            Message send result
-        """
-        # TODO: Send message via Slack API
-        pass
-    
-    async def send_rca_summary(self, channel: str, rca_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Send formatted RCA summary to Slack.
-        
-        Args:
-            channel: Channel name or ID
-            rca_data: RCA analysis result
-            
-        Returns:
-            Message send result
-        """
-        # TODO: Format RCA as blocks and send
-        pass
-    
-    async def send_approval_request(self, channel: str, action: Dict[str, Any]) -> Dict[str, Any]:
-        """Send remediation approval request to Slack.
-        
-        Args:
-            channel: Channel name or ID
-            action: Remediation action details
-            
-        Returns:
-            Message send result with thread_ts
-        """
-        # TODO: Create interactive approval buttons
-        # TODO: Send approval request
-        pass
+    """Post incident/approval notifications to Slack (mock logs the message)."""
+
+    def __init__(self, token: str | None = None, mock: bool | None = None) -> None:
+        self.token = token or settings.slack_bot_token
+        self.mock = settings.integrations_mock_mode if mock is None else mock
+
+    async def post_message(self, channel: str, text: str) -> dict[str, Any]:
+        if not self.mock and self.token:  # pragma: no cover - requires Slack
+            return await self._real_post(channel, text)
+        logger.info("slack.mock_post", channel=channel, text=text)
+        return {"ok": True, "channel": channel, "text": text, "mock": True}
+
+    async def _real_post(self, channel: str, text: str) -> dict[str, Any]:  # pragma: no cover
+        import httpx
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                "https://slack.com/api/chat.postMessage",
+                headers={"Authorization": f"Bearer {self.token}"},
+                json={"channel": channel, "text": text},
+            )
+            resp.raise_for_status()
+            return resp.json()

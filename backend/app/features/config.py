@@ -3,43 +3,45 @@
 Manages feature-specific configuration and settings.
 """
 
-from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
-from app.features.flags import FeatureFlagClient, get_feature_flag_client
+from typing import Any
+
+from app.features.flags import get_feature_flag_client
 
 
 @dataclass
 class FeatureConfig:
     """Configuration for a specific feature."""
+
     name: str
     enabled: bool = False
     rollout_percentage: int = 0  # 0-100
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
     target_users: list[str] = field(default_factory=list)
     target_environments: list[str] = field(default_factory=list)
 
 
 class FeatureConfigManager:
     """Manages feature configurations.
-    
+
     Provides centralized management of feature configurations,
     integrating with feature flags for gradual rollouts.
     """
-    
+
     def __init__(self) -> None:
         """Initialize feature config manager."""
-        self.configs: Dict[str, FeatureConfig] = {}
+        self.configs: dict[str, FeatureConfig] = {}
         self.flag_client = get_feature_flag_client()
-    
+
     def register_feature(
         self,
         name: str,
         enabled: bool = False,
         rollout_percentage: int = 0,
-        config: Optional[Dict[str, Any]] = None,
+        config: dict[str, Any] | None = None,
     ) -> None:
         """Register a new feature configuration.
-        
+
         Args:
             name: Feature name
             enabled: Whether feature is enabled
@@ -52,70 +54,70 @@ class FeatureConfigManager:
             rollout_percentage=rollout_percentage,
             config=config or {},
         )
-    
+
     def get_feature_config(
         self,
         name: str,
-        user_id: Optional[str] = None,
-    ) -> Optional[FeatureConfig]:
+        user_id: str | None = None,
+    ) -> FeatureConfig | None:
         """Get feature configuration.
-        
+
         Args:
             name: Feature name
             user_id: Optional user identifier for targeting
-            
+
         Returns:
             Feature configuration or None if not found
         """
         if name not in self.configs:
             return None
-        
+
         config = self.configs[name]
-        
+
         # Check feature flag
         flag_enabled = self.flag_client.is_enabled(
             f"feature_{name}",
             user_id,
             default=config.enabled,
         )
-        
+
         if not flag_enabled:
             return None
-        
+
         return config
-    
+
     def is_feature_enabled(
         self,
         name: str,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
     ) -> bool:
         """Check if feature is enabled for user.
-        
+
         Args:
             name: Feature name
             user_id: Optional user identifier
-            
+
         Returns:
             True if feature is enabled
         """
         config = self.get_feature_config(name, user_id)
         return config is not None and config.enabled
-    
+
     def get_feature_value(
         self,
         name: str,
         key: str,
         default: Any = None,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
     ) -> Any:
         """Get feature configuration value.
-        
+
         Args:
             name: Feature name
             key: Configuration key
             default: Default value if not found
             user_id: Optional user identifier
-            
+
         Returns:
             Configuration value or default
         """
@@ -126,12 +128,12 @@ class FeatureConfigManager:
 
 
 # Global feature config manager
-_feature_config_manager: Optional[FeatureConfigManager] = None
+_feature_config_manager: FeatureConfigManager | None = None
 
 
 def get_feature_config_manager() -> FeatureConfigManager:
     """Get global feature config manager instance.
-    
+
     Returns:
         Feature config manager instance
     """
@@ -139,4 +141,3 @@ def get_feature_config_manager() -> FeatureConfigManager:
     if _feature_config_manager is None:
         _feature_config_manager = FeatureConfigManager()
     return _feature_config_manager
-

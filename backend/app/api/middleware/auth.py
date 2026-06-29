@@ -1,24 +1,33 @@
-"""Authentication middleware.
+"""Authentication context middleware.
 
-Handles token validation and authorization.
+Best-effort extraction of the authenticated principal from the bearer token onto
+``request.state`` (``username`` / ``role``). This is NON-enforcing — it only
+enriches logging and rate-limiting context. Endpoint authorization is enforced by
+the ``get_current_user`` / ``require_role`` dependencies in ``app.security.auth``.
 """
 
-from typing import Optional
+from __future__ import annotations
 
-class AuthMiddleware:
-    """Authentication middleware for securing endpoints."""
-    
-    def __init__(self) -> None:
-        """Initialize auth middleware."""
-        # TODO: Set up auth configuration
-        pass
-    
-    async def verify_token(self, token: str) -> Optional[dict]:
-        """Verify JWT or API token."""
-        # TODO: Implement token verification logic
-        pass
-    
-    async def get_current_user(self) -> dict:
-        """Get current authenticated user."""
-        # TODO: Extract user from request context
-        pass
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+
+from app.security.auth import decode_token
+
+
+class AuthContextMiddleware(BaseHTTPMiddleware):
+    """Populate request.state.username/role from a valid bearer token, if present."""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        request.state.username = None
+        request.state.role = None
+        auth = request.headers.get("authorization", "")
+        if auth.lower().startswith("bearer "):
+            token = auth[7:].strip()
+            try:
+                payload = decode_token(token)
+                request.state.username = payload.get("sub")
+                request.state.role = payload.get("role")
+            except Exception:
+                # Invalid/expired token: leave context empty; dependencies will 401.
+                pass
+        return await call_next(request)

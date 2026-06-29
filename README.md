@@ -1,6 +1,40 @@
-# AI-SRE Platform
+# IncidentIQ — AI-SRE Platform
 
-Production-grade AI-powered Site Reliability Engineering platform that automates incident detection, root cause analysis, and self-healing remediation.
+AI-powered Site Reliability Engineering platform that ingests alerts, correlates
+them into incidents, runs a **multi-agent root-cause analysis**, and proposes
+**human-approved self-healing** remediations.
+
+> **Runs with zero external accounts.** Out of the box it uses SQLite, an
+> in-process cache, a deterministic offline LLM, and mock integrations — so you
+> can `pip install` and have the full alert → incident → RCA → remediation flow
+> working in minutes. Plug in PostgreSQL, OpenAI, Kubernetes, Slack, etc. by
+> setting environment variables.
+
+---
+
+## Implementation status
+
+This repository contains a **fully working vertical slice** plus the scaffolding
+for a broader platform. Be aware of what is real vs. illustrative:
+
+| Area | Status |
+|------|--------|
+| Auth (JWT + RBAC: viewer/operator/admin) | ✅ Implemented + tested |
+| Alert ingestion, dedup fingerprinting, correlation | ✅ Implemented + tested |
+| Incident lifecycle + persistence (SQLAlchemy 2.0 async) | ✅ Implemented + tested |
+| Multi-agent RCA (triage → context → knowledge/RAG → RCA → supervisor) | ✅ Implemented + tested |
+| RAG knowledge base (chunk + embed + cosine search over runbooks) | ✅ Implemented + tested |
+| Self-healing remediation + human-in-the-loop approval | ✅ Implemented + tested |
+| OpenAI LLM path (auto-enabled when `OPENAI_API_KEY` is set) | ✅ Implemented (falls back to deterministic mock) |
+| Observability: structured logs, Prometheus `/metrics`, request IDs | ✅ Implemented |
+| REST API + OpenAPI docs (`/docs`) | ✅ Implemented |
+| React dashboard (login, incidents, RCA, approve/reject, knowledge search) | ✅ Implemented (build via Docker/Node 20) |
+| CI (GitHub Actions: lint, tests, frontend build, image build) | ✅ Implemented |
+| Alembic migrations (SQLite + PostgreSQL) | ✅ Implemented |
+| External integrations (K8s, Prometheus, Slack, PagerDuty, GitHub, Terraform) | ⚠️ Mock-mode adapters; real branches stubbed behind flags |
+| Background workers, ML anomaly detection, Kafka/Vault | 🧱 Scaffolded stubs (not part of the runnable slice) |
+
+The 28-test suite exercises the end-to-end flow (`backend/tests`).
 
 ## Architecture
 
@@ -11,270 +45,142 @@ Production-grade AI-powered Site Reliability Engineering platform that automates
 │  │Prometheus│  │   Loki   │  │  OTel    │  │  Kafka   │      │
 │  │ Metrics  │  │  Logs    │  │ Traces   │  │  Events  │      │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘      │
-└───────┼─────────────┼─────────────┼─────────────┼──────────────┘
-        │             │             │             │
-        └─────────────┴─────────────┴─────────────┘
-                          │
-                          ▼
-        ┌─────────────────────────────────────┐
-        │      AI Intelligence Core            │
-        │  ┌──────────┐  ┌──────────┐        │
-        │  │ Anomaly  │  │  Alert   │        │
-        │  │Detection │  │Correlation│        │
-        │  └────┬─────┘  └────┬─────┘        │
-        │       │              │              │
-        │       └──────┬───────┘              │
-        │              ▼                      │
-        │     ┌─────────────────┐             │
-        │     │ Multi-Agent     │             │
-        │     │ Orchestration   │             │
-        │     └────────┬────────┘             │
-        │              │                      │
-        │              ▼                      │
-        │     ┌─────────────────┐             │
-        │     │  RAG Knowledge  │             │
-        │     │    Retrieval    │             │
-        │     └────────┬────────┘             │
-        └──────────────┼──────────────────────┘
-                       │
-                       ▼
-        ┌─────────────────────────────────────┐
-        │      Functional Features             │
-        │  ┌──────────┐  ┌──────────┐        │
-        │  │Automated │  │Predictive │        │
-        │  │   RCA    │  │ Planning  │        │
-        │  └────┬─────┘  └────┬─────┘        │
-        │       │              │              │
-        │       └──────┬───────┘              │
-        │              ▼                      │
-        │     ┌─────────────────┐             │
-        │     │ Self-Healing    │             │
-        │     │    Actions      │             │
-        │     └────────┬────────┘             │
-        └──────────────┼──────────────────────┘
-                       │
-                       ▼
-        ┌─────────────────────────────────────┐
-        │      Action & Feedback                │
-        │  ┌──────────┐  ┌──────────┐        │
-        │  │ ChatOps  │  │Infrastructure│     │
-        │  │(Slack/PD)│  │(K8s/Terraform)│    │
-        │  └────┬─────┘  └────┬─────┘        │
-        │       │              │              │
-        │       └──────┬───────┘              │
-        │              ▼                      │
-        │     ┌─────────────────┐             │
-        │     │ Human Approval   │             │
-        │     │   (HITL)         │             │
-        │     └─────────────────┘             │
-        └─────────────────────────────────────┘
+└───────┼─────────────┴─────────────┴─────────────┘──────────────┘
+        ▼
+   ┌─────────────────────────────────────┐
+   │      AI Intelligence Core            │
+   │  Triage → Context → Knowledge (RAG)  │
+   │            → RCA → Supervisor        │
+   └──────────────┬──────────────────────┘
+                  ▼
+   ┌─────────────────────────────────────┐
+   │   Remediation + Human Approval (HITL)│
+   │   restart / scale / rollback / IaC   │
+   └─────────────────────────────────────┘
 ```
 
-## Tech Stack
+## Tech stack
 
-### Backend
-- **FastAPI** - Modern async Python web framework
-- **Python 3.12+** - Latest Python features
-- **SQLAlchemy 2.0** - Modern ORM with async support
-- **PostgreSQL + pgvector** - Vector database for RAG
-- **Redis** - Caching and pub/sub
-- **Dramatiq** - Modern async task queue (replaces Celery)
-- **LangGraph** - Multi-agent orchestration
-- **OpenTelemetry** - Unified observability
-- **structlog** - Structured logging
+**Backend (core, lean & always installed):** FastAPI · SQLAlchemy 2.0 async ·
+SQLite/PostgreSQL · Alembic · PyJWT · numpy (RAG) · structlog ·
+prometheus-client · OpenAI SDK (optional at runtime).
 
-### Frontend
-- **React 18+** - UI library
-- **TypeScript 5+** - Type safety
-- **Vite** - Build tool
-- **Tailwind CSS v4** - Styling
-- **TanStack Query** - Server state management
-- **Zustand** - Client state management
-- **Zod** - Runtime validation
+**Backend (optional extras, see `backend/requirements-optional.txt`):** LangGraph ·
+scikit-learn/Prophet · Kubernetes · Kafka · Vault · sentence-transformers ·
+OpenTelemetry.
 
-### Infrastructure
-- **Terraform** - Infrastructure as Code
-- **Kubernetes** - Container orchestration
-- **Helm** - K8s package management
-- **ArgoCD** - GitOps deployment
-- **Docker** - Containerization
-- **Prometheus + Grafana** - Monitoring
-- **OpenTelemetry Collector** - Observability pipeline
+**Frontend:** React 18 · TypeScript · Vite · Tailwind v4 · TanStack Query · Zustand.
 
-### AI/ML
-- **OpenAI/Anthropic** - LLM providers
-- **LangSmith/LangFuse** - LLM observability
-- **scikit-learn** - Anomaly detection
-- **Prophet** - Time-series forecasting
-- **sentence-transformers** - Embeddings
+**Infra:** Docker · docker-compose · Terraform · Kubernetes/Helm · Prometheus + Grafana.
 
-## Quick Start
+## Quick start
 
 ### Prerequisites
-- Python 3.12+
-- Node.js 20+
-- Docker & Docker Compose
-- PostgreSQL 16+
-- Redis 7+
+- Python 3.11+ (3.12 recommended)
+- Docker & Docker Compose (for the full stack)
+- Node 20+ (only to build the frontend natively; otherwise use Docker)
 
-### Local Setup
+### Option A — Backend only, locally (fastest)
 
-1. **Clone repository**
-   ```bash
-   git clone <repository-url>
-   cd IncidentIQ
-   ```
+```bash
+cd backend
+python -m venv venv
+# Windows: venv\Scripts\activate   •   Linux/macOS: source venv/bin/activate
+pip install -r requirements-dev.txt
 
-2. **Setup environment**
-   ```bash
-   make setup-local
-   ```
+uvicorn app.main:app --reload
+```
 
-3. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+On startup the app creates the schema (SQLite), seeds demo users, and indexes the
+sample runbooks. Then:
 
-4. **Start services**
-   ```bash
-   make docker-up
-   ```
+- API docs: http://localhost:8000/docs
+- Health: http://localhost:8000/health
+- Metrics: http://localhost:8000/metrics
 
-5. **Run migrations**
-   ```bash
-   make migrate
-   ```
+Drive the demo flow:
 
-6. **Start development servers**
-   ```bash
-   # Terminal 1: Backend
-   make run-backend
+```bash
+python ../scripts/simulate_alerts.py 5      # ingest alerts -> incidents -> RCA
+```
 
-   # Terminal 2: Frontend
-   make run-frontend
+### Option B — Full stack with Docker Compose
 
-   # Terminal 3: Workers
-   make run-workers
-   ```
+```bash
+cp .env.example .env          # optional; sensible defaults work as-is
+docker compose up --build
+```
 
-7. **Access services**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - API Docs: http://localhost:8000/docs
-   - Grafana: http://localhost:3001
-   - Prometheus: http://localhost:9090
+- Frontend: http://localhost:3000
+- Backend API / docs: http://localhost:8000/docs
+- Grafana: http://localhost:3001 · Prometheus: http://localhost:9090
 
-## Project Structure
+### Demo credentials
+
+| User | Password | Role |
+|------|----------|------|
+| `admin` | `admin123` | admin |
+| `operator` | `operator123` | operator (can ingest/approve) |
+| `viewer` | `viewer123` | viewer (read-only) |
+
+### Enabling the real LLM
+
+Set `OPENAI_API_KEY` (and optionally `LLM_MODEL`, default `gpt-4o-mini`). The RCA
+agent automatically uses OpenAI and falls back to the deterministic engine if the
+call fails. With no key, everything still works using the offline engine.
+
+## The end-to-end flow
+
+1. `POST /api/v1/alerts/ingest` — an alert is stored, fingerprinted, and correlated
+   to an active incident for its service (or a new one is created).
+2. The supervisor runs **triage → context → knowledge (RAG) → RCA**, producing a
+   root cause, confidence, and a recommended action.
+3. If confidence ≥ `RCA_AUTO_PROPOSE_THRESHOLD` a remediation is auto-proposed in
+   `pending_approval` (human-in-the-loop).
+4. An operator approves via `POST /api/v1/remediation/{id}/approve`; the executor
+   runs the action (mock by default) and the incident moves to `remediating`.
+
+## Project structure
 
 ```
-ai-sre-platform/
-├── backend/          # FastAPI backend
+IncidentIQ/
+├── backend/
 │   ├── app/
-│   │   ├── agents/   # Multi-agent system
-│   │   ├── ml/       # ML models
-│   │   ├── rag/      # RAG pipeline
-│   │   ├── services/ # Business logic
-│   │   ├── security/ # Auth & security
-│   │   ├── events/   # Event-driven architecture
-│   │   └── cost/     # Cost tracking
-│   └── tests/        # Test suite
-├── frontend/         # React frontend
-│   └── src/
-│       ├── components/
-│       ├── pages/
-│       └── hooks/
-├── infra/            # Infrastructure
-│   ├── terraform/    # IaC
-│   ├── kubernetes/   # K8s manifests
-│   └── helm/        # Helm charts
-├── monitoring/       # Observability configs
-└── scripts/         # Utility scripts
+│   │   ├── agents/        # multi-agent RCA pipeline + LLM provider
+│   │   ├── api/           # FastAPI routers + middleware
+│   │   ├── core/          # config + exceptions
+│   │   ├── db/            # async engine + Alembic migrations
+│   │   ├── integrations/  # mockable external system adapters
+│   │   ├── models/        # SQLAlchemy models + Pydantic schemas + enums
+│   │   ├── observability/ # logging, metrics, tracing
+│   │   ├── rag/           # embeddings, chunker, vector store, retriever
+│   │   ├── remediation/   # executor + actions + approval flow
+│   │   ├── security/      # JWT auth, RBAC, rate limiting, validation
+│   │   └── services/      # business logic (alert/incident/remediation/knowledge)
+│   ├── data/              # sample runbooks, postmortems, alerts
+│   └── tests/             # pytest suite (end-to-end + unit)
+├── frontend/              # React + TypeScript dashboard
+├── infra/                 # Terraform / Kubernetes / Helm
+├── monitoring/            # Prometheus + Grafana config
+└── scripts/               # seed_knowledge.py, simulate_alerts.py
 ```
-
-## Key Features
-
-### 🤖 Multi-Agent System
-- **Supervisor Agent**: Orchestrates specialist agents
-- **Triage Agent**: Filters noise and duplicates
-- **Context Agent**: Gathers logs, metrics, events
-- **Knowledge Agent**: RAG search through runbooks
-- **RCA Agent**: Synthesizes root cause analysis
-
-### 🔍 Automated RCA
-- AI-powered root cause analysis
-- Confidence scoring
-- Evidence-based recommendations
-- Historical incident correlation
-
-### 🛠️ Self-Healing
-- Automated remediation actions
-- Human-in-the-loop approval
-- Rollback capabilities
-- Action logging and auditing
-
-### 📊 Observability
-- OpenTelemetry traces, metrics, logs
-- Real-time dashboards
-- Cost tracking (LLM + infrastructure)
-- Alert correlation
-
-### 🔐 Security
-- JWT authentication
-- Vault secret management
-- Rate limiting
-- Input validation
-- RBAC
 
 ## Development
 
-### Running Tests
 ```bash
-make test              # All tests
-make test-backend      # Backend only
-make test-frontend     # Frontend only
+# Backend
+cd backend
+ruff check . && black --check .     # lint + format
+pytest --cov=app                    # tests
+alembic upgrade head                # migrations (PostgreSQL)
+
+# Frontend
+cd frontend
+npm ci
+npm run typecheck                   # tsc (advisory)
+npm run build                       # production build (Vite)
 ```
-
-### Linting & Formatting
-```bash
-make lint              # Check code quality
-make format            # Auto-format code
-```
-
-### Database Migrations
-```bash
-make migrate                    # Run migrations
-make migrate-create MESSAGE="..."  # Create migration
-```
-
-## Deployment
-
-### Development
-```bash
-make deploy-dev
-```
-
-### Production
-```bash
-make deploy-prod  # Requires confirmation
-```
-
-## Documentation
-
-- [Architecture](./docs/architecture.md)
-- [Agent Workflows](./docs/agent_workflows.md)
-- [Deployment Guide](./docs/deployment.md)
-- [API Documentation](./docs/api/openapi.yaml)
-- [Security Best Practices](./docs/security.md)
-
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT License
-
-## Support
-
-For issues and questions, please open an issue on GitHub.
+MIT — see [CONTRIBUTING.md](./CONTRIBUTING.md) and [SECURITY.md](./SECURITY.md).

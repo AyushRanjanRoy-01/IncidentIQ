@@ -38,6 +38,13 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ai_sre_user:ai_sre_password@postgres:5432/ai_sre_db
       REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-insecure-change-me}
+      SEED_DEMO_USERS: "true"
+      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      INTEGRATIONS_MOCK_MODE: "true"
+      LOG_JSON: "true"
     depends_on:
       postgres:
         condition: service_healthy

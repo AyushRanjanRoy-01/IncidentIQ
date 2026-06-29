@@ -1,93 +1,41 @@
-"""Human-in-the-loop approval workflow."""
+"""Human-in-the-loop approval workflow notifications.
 
-from typing import Dict, Any, Optional
-from enum import Enum
-from datetime import datetime
+The authoritative approval *state* lives on the ``RemediationLog`` row (managed by
+``RemediationService``). This module handles the surrounding ChatOps/paging
+notifications so on-call engineers are looped in when a fix needs approval or a
+decision is made.
+"""
 
-class ApprovalStatus(str, Enum):
-    """Approval status."""
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    EXPIRED = "expired"
+from __future__ import annotations
 
-class ApprovalRequest:
-    """Approval request for remediation action."""
-    
-    def __init__(self, action_id: str, action_description: str, 
-                 rca_summary: str, confidence: float) -> None:
-        """Initialize approval request.
-        
-        Args:
-            action_id: Action ID
-            action_description: Description of proposed action
-            rca_summary: RCA analysis summary
-            confidence: Confidence score for action
-        """
-        self.action_id = action_id
-        self.action_description = action_description
-        self.rca_summary = rca_summary
-        self.confidence = confidence
-        self.status = ApprovalStatus.PENDING
-        self.created_at = datetime.utcnow()
-        self.approved_by = None
-        self.approved_at = None
-    
-    async def approve(self, approved_by: str) -> None:
-        """Approve the action.
-        
-        Args:
-            approved_by: User who approved the action
-        """
-        # TODO: Update status to APPROVED
-        # TODO: Record approver and timestamp
-        pass
-    
-    async def reject(self, rejected_by: str, reason: str) -> None:
-        """Reject the action.
-        
-        Args:
-            rejected_by: User who rejected the action
-            reason: Rejection reason
-        """
-        # TODO: Update status to REJECTED
-        # TODO: Record rejecter, reason, and timestamp
-        pass
+import structlog
+
+from app.integrations.hub import IntegrationHub, get_integration_hub
+from app.models.database.remediation_log import RemediationLog
+
+logger = structlog.get_logger(__name__)
+
 
 class ApprovalFlow:
-    """Manages approval workflow."""
-    
-    def __init__(self) -> None:
-        """Initialize approval flow."""
-        # TODO: Initialize notification channels (Slack, PagerDuty)
-        pass
-    
-    async def request_approval(self, action_id: str, action_description: str, 
-                              rca_summary: str, confidence: float) -> str:
-        """Request approval for remediation action.
-        
-        Args:
-            action_id: Action ID
-            action_description: Description of proposed action
-            rca_summary: RCA analysis summary
-            confidence: Confidence score
-            
-        Returns:
-            Request ID
-        """
-        # TODO: Create approval request
-        # TODO: Notify on-call engineer via Slack/PagerDuty
-        # TODO: Return request ID for tracking
-        pass
-    
-    async def get_approval_status(self, request_id: str) -> ApprovalStatus:
-        """Get approval status.
-        
-        Args:
-            request_id: Request ID
-            
-        Returns:
-            Current approval status
-        """
-        # TODO: Query approval status from database
-        pass
+    """Sends notifications for the approval lifecycle."""
+
+    def __init__(self, hub: IntegrationHub | None = None) -> None:
+        self.hub = hub or get_integration_hub()
+
+    async def request_approval(self, remediation: RemediationLog, confidence: float) -> None:
+        await self.hub.notify(
+            f"[ACTION NEEDED] Remediation {remediation.remediation_id} "
+            f"({remediation.action_type} -> {remediation.target}) needs approval for "
+            f"incident {remediation.incident_id} (confidence={confidence}).",
+            severity="critical" if confidence >= 0.8 else "warning",
+        )
+
+    async def notify_decision(
+        self, remediation: RemediationLog, approved: bool, actor: str
+    ) -> None:
+        verb = "approved" if approved else "rejected"
+        await self.hub.notify(
+            f"Remediation *{remediation.remediation_id}* {verb} by {actor} "
+            f"(incident {remediation.incident_id}).",
+            severity="warning",
+        )

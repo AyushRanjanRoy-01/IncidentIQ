@@ -1,84 +1,36 @@
 #!/usr/bin/env python3
-"""Seed knowledge base with sample runbooks and post-mortems.
+"""Seed the knowledge base with the sample runbooks and post-mortems.
 
-This script populates the knowledge base with sample documents
-for RAG retrieval and testing.
+Run from the repo root (uses the backend package + its configured database):
+
+    backend/venv/Scripts/python scripts/seed_knowledge.py   # Windows
+    backend/venv/bin/python scripts/seed_knowledge.py        # Linux/macOS
 """
 
 import asyncio
-import json
+import sys
 from pathlib import Path
-from app.rag.vector_store import VectorStore
-from app.rag.chunker import Chunker
-from app.rag.embeddings import EmbeddingService
-from app.core.config import settings
+
+# Make the backend `app` package importable regardless of the current directory.
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "backend"))
+
+from app.db.postgres import AsyncSessionLocal, init_models  # noqa: E402
+from app.services.knowledge_service import KnowledgeService  # noqa: E402
+
+DATA_DIR = ROOT / "backend" / "data"
 
 
-async def seed_knowledge_base():
-    """Seed knowledge base with sample documents."""
-    print("🌱 Seeding knowledge base...")
-    
-    # Initialize services
-    embedding_service = EmbeddingService()
-    chunker = Chunker()
-    vector_store = VectorStore()
-    
-    # Load sample documents
-    data_dir = Path(__file__).parent.parent / "data"
-    runbooks_dir = data_dir / "runbooks"
-    postmortems_dir = data_dir / "postmortems"
-    
-    documents = []
-    
-    # Load runbooks
-    if runbooks_dir.exists():
-        for runbook_file in runbooks_dir.glob("*.md"):
-            with open(runbook_file, "r") as f:
-                content = f.read()
-                documents.append({
-                    "title": runbook_file.stem,
-                    "content": content,
-                    "type": "runbook",
-                    "source": str(runbook_file),
-                })
-    
-    # Load post-mortems
-    if postmortems_dir.exists():
-        for postmortem_file in postmortems_dir.glob("*.md"):
-            with open(postmortem_file, "r") as f:
-                content = f.read()
-                documents.append({
-                    "title": postmortem_file.stem,
-                    "content": content,
-                    "type": "postmortem",
-                    "source": str(postmortem_file),
-                })
-    
-    # Process and index documents
-    for doc in documents:
-        print(f"📄 Processing: {doc['title']}")
-        
-        # Chunk document
-        chunks = chunker.chunk(doc["content"])
-        
-        # Generate embeddings and store
-        for i, chunk in enumerate(chunks):
-            embedding = await embedding_service.embed(chunk)
-            
-            # TODO: Store in vector database
-            # await vector_store.add_document(
-            #     text=chunk,
-            #     embedding=embedding,
-            #     metadata={
-            #         "title": doc["title"],
-            #         "type": doc["type"],
-            #         "chunk_index": i,
-            #         "source": doc["source"],
-            #     }
-            # )
-    
-    print(f"✅ Indexed {len(documents)} documents")
-    print("🎉 Knowledge base seeding complete!")
+async def seed_knowledge_base() -> None:
+    print("Seeding knowledge base...")
+    await init_models()
+    async with AsyncSessionLocal() as db:
+        service = KnowledgeService(db)
+        count = await service.index_directory(DATA_DIR)
+        await db.commit()
+        total_docs = await service.count()
+    print(f"Indexed {count} document(s); knowledge base now holds {total_docs} document(s).")
+    print("Knowledge base seeding complete.")
 
 
 if __name__ == "__main__":
