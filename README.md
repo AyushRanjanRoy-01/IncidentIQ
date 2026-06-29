@@ -252,6 +252,28 @@ Everything is env-driven (see [`.env.example`](./.env.example)). The most useful
 
 ---
 
+## 🔌 Connecting live systems (go to production)
+
+Out of the box, integrations run in **mock mode**. To connect real
+Kubernetes / Slack / PagerDuty / Prometheus / GitHub:
+
+1. Start from [`.env.production.example`](./.env.production.example), set
+   `INTEGRATIONS_MOCK_MODE=false`, and add each system's credentials.
+2. Create a real admin: `python scripts/create_admin.py --username you --role admin`.
+3. **Validate every connection** before relying on it:
+   ```bash
+   python scripts/check_integrations.py        # green/red per integration
+   # or, as admin:  GET /api/v1/integrations/status
+   ```
+
+Full step-by-step (least-privilege creds, K8s RBAC, validation, first real incident):
+**[docs/ONBOARDING.md](./docs/ONBOARDING.md)**.
+
+Turning this into a multi-tenant product for external customers? The honest gap
+analysis and roadmap live in **[docs/PRODUCTIZATION.md](./docs/PRODUCTIZATION.md)**.
+
+---
+
 ## 🧰 Tech stack
 
 **Backend** FastAPI · async SQLAlchemy 2.0 · SQLite/PostgreSQL · Alembic · PyJWT ·

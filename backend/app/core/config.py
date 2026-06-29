@@ -88,9 +88,13 @@ class Settings(BaseSettings):
     integrations_mock_mode: bool = True
     prometheus_url: str = "http://localhost:9090"
     kubernetes_enabled: bool = False
+    kubernetes_namespace: str = "production"
     slack_bot_token: str = ""
+    slack_channel: str = "#sre"
     pagerduty_api_key: str = ""
+    pagerduty_routing_key: str = ""  # alias; Events API v2 routing key
     github_token: str = ""
+    github_repo: str = ""  # owner/repo for deployment lookups
 
     # ------------------------------------------------------- Observability
     otel_enabled: bool = False

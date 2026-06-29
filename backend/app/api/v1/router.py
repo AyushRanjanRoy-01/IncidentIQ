@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     alerts,
     auth,
     incidents,
+    integrations,
     knowledge,
     metrics,
     remediation,
@@ -21,3 +22,4 @@ router.include_router(incidents.router)
 router.include_router(remediation.router)
 router.include_router(knowledge.router)
 router.include_router(metrics.router)
+router.include_router(integrations.router)

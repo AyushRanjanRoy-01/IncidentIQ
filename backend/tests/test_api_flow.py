@@ -99,3 +99,18 @@ async def test_knowledge_search_endpoint(client, viewer_headers):
     )
     assert resp.status_code == 200
     assert len(resp.json()) >= 1
+
+
+@pytest.mark.asyncio
+async def test_integrations_status_admin_only(client, viewer_headers, admin_headers):
+    # Viewers cannot see integration status.
+    assert (
+        await client.get("/api/v1/integrations/status", headers=viewer_headers)
+    ).status_code == 403
+    # Admins get a per-integration health report (mock mode in tests).
+    resp = await client.get("/api/v1/integrations/status", headers=admin_headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["mock_mode"] is True
+    names = {i["name"] for i in body["integrations"]}
+    assert {"slack", "kubernetes", "prometheus"}.issubset(names)
