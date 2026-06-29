@@ -1,38 +1,26 @@
 """Deployment rollback action."""
 
-from typing import Dict, Any
+from __future__ import annotations
+
+from typing import Any
+
 from app.integrations.kubernetes import KubernetesClient
 
+
 class RollbackAction:
-    """Rolls back a deployment to previous version."""
-    
-    def __init__(self) -> None:
-        """Initialize rollback action."""
-        # TODO: Initialize Kubernetes client
-        pass
-    
-    async def execute(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute rollback.
-        
-        Args:
-            parameters: Action parameters including namespace, deployment, revision
-            
-        Returns:
-            Execution result
-        """
-        # TODO: Call Kubernetes client to rollback
-        # TODO: Return rollback status
-        pass
-    
-    async def verify(self, parameters: Dict[str, Any]) -> bool:
-        """Verify rollback was successful.
-        
-        Args:
-            parameters: Action parameters
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        # TODO: Check deployment status
-        # TODO: Verify metrics improving
-        pass
+    """Rolls a service back to a previous known-good version."""
+
+    action_type = "rollback"
+
+    def __init__(self, k8s: KubernetesClient) -> None:
+        self.k8s = k8s
+
+    async def execute(self, target: str, parameters: dict[str, Any]) -> dict[str, Any]:
+        return await self.k8s.rollback(
+            service=target,
+            namespace=parameters.get("namespace", "production"),
+            to_version=parameters.get("to_version", "previous"),
+        )
+
+    async def verify(self, target: str, parameters: dict[str, Any]) -> bool:
+        return True

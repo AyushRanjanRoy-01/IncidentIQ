@@ -1,67 +1,120 @@
-/**
- * TypeScript type definitions.
- * 
- * Centralized type definitions for the application.
- */
+/** Shared API types (mirror the backend Pydantic schemas). */
+
+export type Severity = 'critical' | 'warning' | 'info'
+
+export type IncidentStatus =
+  | 'open'
+  | 'analyzing'
+  | 'awaiting_approval'
+  | 'remediating'
+  | 'resolved'
+  | 'closed'
+
+export type RemediationStatus =
+  | 'proposed'
+  | 'pending_approval'
+  | 'approved'
+  | 'rejected'
+  | 'executing'
+  | 'succeeded'
+  | 'failed'
+  | 'rolled_back'
+
+export interface Token {
+  access_token: string
+  token_type: string
+  expires_in: number
+  username: string
+  role: string
+}
+
+export interface User {
+  username: string
+  full_name: string
+  email: string
+  role: string
+  disabled: boolean
+}
+
+export interface RecommendedAction {
+  action_type: string
+  target: string
+  parameters: Record<string, unknown>
+  rationale?: string
+}
 
 export interface Alert {
   alert_id: string
-  severity: 'critical' | 'warning' | 'info'
   service: string
+  severity: Severity
   metric: string
   value: number
   threshold: number
-  timestamp: string
-  labels?: Record<string, string>
-}
-
-export interface Incident {
-  incident_id: string
-  title: string
-  description?: string
-  status: 'open' | 'investigating' | 'resolved' | 'closed'
-  severity: 'critical' | 'high' | 'medium' | 'low'
-  service: string
+  summary?: string
+  labels: Record<string, unknown>
+  status: string
+  fingerprint: string
+  fired_at: string
+  incident_id?: string
   created_at: string
-  updated_at: string
-  resolved_at?: string
 }
 
 export interface Remediation {
   remediation_id: string
   incident_id: string
   action_type: string
-  description: string
-  status: 'pending' | 'approved' | 'rejected' | 'executed' | 'completed' | 'failed'
-  confidence: number
+  target: string
+  parameters: Record<string, unknown>
+  status: RemediationStatus
+  confidence?: number
+  rationale?: string
   requires_approval: boolean
-  created_at: string
-  executed_at?: string
-}
-
-export interface RCA {
-  incident_id: string
-  root_cause: string
-  confidence: number
-  contributing_factors: string[]
-  evidence: string[]
-  recommended_actions: string[]
-  generated_at: string
-}
-
-export interface KnowledgeDoc {
-  doc_id: string
-  title: string
-  type: 'runbook' | 'postmortem' | 'article'
-  content: string
-  tags: string[]
+  proposed_by: string
+  approved_by?: string
+  rejected_by?: string
+  rejection_reason?: string
+  result?: Record<string, unknown>
   created_at: string
   updated_at: string
 }
 
-export interface User {
-  id: string
-  name: string
-  email: string
-  roles: string[]
+export interface Incident {
+  incident_id: string
+  title: string
+  service: string
+  incident_type: string
+  severity: Severity
+  status: IncidentStatus
+  root_cause?: string
+  rca_summary?: Record<string, unknown>
+  recommended_action?: RecommendedAction
+  confidence?: number
+  resolution?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface IncidentDetail extends Incident {
+  alerts: Alert[]
+  remediations: Remediation[]
+}
+
+export interface KnowledgeResult {
+  chunk_id: string
+  doc_id: string
+  title: string
+  source_type: string
+  content: string
+  score: number
+}
+
+export interface DashboardSummary {
+  incidents: {
+    total: number
+    open: number
+    resolved: number
+    by_status: Record<string, number>
+  }
+  alerts: { total: number }
+  remediations: { total: number; succeeded: number; pending_approval: number }
 }

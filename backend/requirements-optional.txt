@@ -1,0 +1,53 @@
+# IncidentIQ backend — OPTIONAL dependencies.
+#
+# These power the *real* integrations and advanced ML/agent features. They are
+# NOT required to run the implemented vertical slice (which works fully offline
+# with the core requirements). Install selectively as you wire up real systems.
+#
+#     pip install -r requirements.txt -r requirements-optional.txt
+
+# --- PostgreSQL extras -------------------------------------------------------
+psycopg2-binary==2.9.9
+pgvector==0.2.5            # production vector store backend (PostgreSQL + pgvector)
+
+# --- Agent orchestration / LLM ecosystem ------------------------------------
+langchain==0.1.16
+langgraph==0.0.38
+langsmith==0.1.45
+anthropic==0.25.1
+tiktoken==0.6.0           # accurate token counting for cost tracking
+
+# --- ML / data ---------------------------------------------------------------
+scikit-learn==1.4.2       # anomaly detection / alert correlation
+prophet==1.1.5            # time-series forecasting
+pandas==2.2.1
+sentence-transformers==2.6.1  # local transformer embeddings
+
+# --- Background workers ------------------------------------------------------
+dramatiq==1.16.0
+
+# --- Kubernetes / IaC --------------------------------------------------------
+kubernetes==29.0.0
+kopf==1.37.2
+python-terraform==0.10.1
+
+# --- ChatOps / integrations --------------------------------------------------
+slack-sdk==3.27.1
+PyGithub==2.3.0
+prometheus-api-client==0.5.4
+
+# --- Secrets / feature flags / resilience -----------------------------------
+hvac==2.1.0               # HashiCorp Vault client
+UnleashClient==5.11.1     # feature flags
+pybreaker==1.2.0          # circuit breakers
+slowapi==0.1.9            # alternative rate limiting backed by limits
+
+# --- Event streaming ---------------------------------------------------------
+kafka-python==2.0.2
+
+# --- Observability (OpenTelemetry) ------------------------------------------
+opentelemetry-api==1.24.0
+opentelemetry-sdk==1.24.0
+opentelemetry-exporter-otlp==1.24.0
+opentelemetry-instrumentation-fastapi==0.45b0
+opentelemetry-instrumentation-sqlalchemy==0.45b0

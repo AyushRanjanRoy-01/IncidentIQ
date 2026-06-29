@@ -1,56 +1,49 @@
 """Knowledge agent using RAG for solution retrieval.
 
-Searches knowledge base (runbooks, post-mortems, PRs) to find
-relevant solutions and best practices.
+Searches the knowledge base (runbooks, postmortems) via the hybrid
+``KnowledgeRetriever`` to surface the most relevant remediation guidance for the
+incident at hand.
 """
 
-from typing import Dict, Any, List
+from __future__ import annotations
+
+from typing import Any
+
+import structlog
+
 from app.agents.state import AgentState
+from app.rag.retriever import KnowledgeRetriever
+
+logger = structlog.get_logger(__name__)
+
 
 class KnowledgeAgent:
-    """Retrieves relevant knowledge from RAG system."""
-    
-    def __init__(self) -> None:
-        """Initialize knowledge agent."""
-        # TODO: Initialize vector store and retriever
-        pass
-    
-    async def retrieve_knowledge(self, state: AgentState, query: str) -> List[Dict[str, Any]]:
-        """Retrieve relevant knowledge documents.
-        
-        Args:
-            state: Shared agent state
-            query: Search query
-            
-        Returns:
-            List of relevant documents with scores
-        """
-        # TODO: Implement hybrid search (vector + keyword)
-        # TODO: Rerank results
-        # TODO: Return top 3 solutions
-        pass
-    
-    async def find_similar_incidents(self, state: AgentState) -> List[Dict[str, Any]]:
-        """Find similar past incidents from post-mortems.
-        
-        Args:
-            state: Shared agent state
-            
-        Returns:
-            List of similar incident records
-        """
-        # TODO: Search post-mortem documents
-        # TODO: Extract relevant resolution steps
-        pass
-    
-    async def get_relevant_runbooks(self, alert_type: str) -> List[Dict[str, Any]]:
-        """Get runbooks relevant to alert type.
-        
-        Args:
-            alert_type: Type of alert
-            
-        Returns:
-            List of relevant runbooks
-        """
-        # TODO: Search runbook database
-        pass
+    """Retrieves relevant knowledge from the RAG system."""
+
+    def __init__(self, retriever: KnowledgeRetriever) -> None:
+        self.retriever = retriever
+
+    def _query(self, state: AgentState) -> str:
+        parts = [state.service, state.metric, state.severity, state.summary]
+        if state.context_data and state.context_data.get("had_recent_deploy"):
+            parts.append("recent deployment rollback")
+        return " ".join(p for p in parts if p)
+
+    async def retrieve_knowledge(self, state: AgentState, top_k: int = 4) -> list[dict[str, Any]]:
+        query = self._query(state)
+        chunks = await self.retriever.retrieve(query, top_k=top_k)
+        results = [
+            {
+                "chunk_id": c.chunk_id,
+                "doc_id": c.doc_id,
+                "score": c.score,
+                "content": c.content,
+            }
+            for c in chunks
+        ]
+        state.knowledge_results = results
+        state.add_log("knowledge", f"Retrieved {len(results)} knowledge chunks for: {query!r}")
+        logger.info(
+            "agent.knowledge", incident_id=state.incident_id, hits=len(results), query=query
+        )
+        return results

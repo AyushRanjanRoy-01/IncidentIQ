@@ -1,24 +1,17 @@
-"""Approval request/response schemas."""
+"""Human-in-the-loop approval schemas (Pydantic v2)."""
 
-from pydantic import BaseModel
-from typing import Dict, Any, Optional
-from datetime import datetime
+from __future__ import annotations
 
-class ApprovalRequestCreate(BaseModel):
-    """Schema for creating approval request."""
-    action_id: str
-    action_description: str
-    rca_summary: str
-    confidence: float
+from pydantic import BaseModel, Field
 
-class ApprovalRequestResponse(BaseModel):
-    """Schema for approval request response."""
-    request_id: str
-    action_id: str
-    status: str
-    created_at: datetime
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
-    
-    class Config:
-        from_attributes = True
+
+class ApproveRequest(BaseModel):
+    """Approve a pending remediation (optional note for the audit trail)."""
+
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class RejectRequest(BaseModel):
+    """Reject a pending remediation with a reason."""
+
+    reason: str = Field(..., min_length=1, max_length=1000)

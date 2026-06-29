@@ -1,63 +1,60 @@
 /**
- * Zustand store for global state management.
- * 
- * Provides centralized state management for application.
+ * Global auth store (Zustand).
+ *
+ * Holds the JWT + current user, persisted to localStorage so a refresh keeps
+ * the session. Exposes login/logout used by the app shell.
  */
 
 import { create } from 'zustand'
-import { devtools } from 'zustand/middleware'
 
-interface AppState {
-  user: {
-    id: string | null
-    name: string | null
-    roles: string[]
-  } | null
-  theme: 'light' | 'dark'
-  notifications: Array<{
-    id: string
-    message: string
-    type: 'info' | 'success' | 'warning' | 'error'
-    timestamp: Date
-  }>
-  setUser: (user: AppState['user']) => void
-  setTheme: (theme: 'light' | 'dark') => void
-  addNotification: (notification: Omit<AppState['notifications'][0], 'id' | 'timestamp'>) => void
-  removeNotification: (id: string) => void
+import { AuthAPI, TOKEN_KEY } from '@/services/api'
+import type { User } from '@/types'
+
+interface AuthState {
+  token: string | null
+  user: User | null
+  role: string | null
+  loading: boolean
+  error: string | null
+  login: (username: string, password: string) => Promise<void>
+  logout: () => void
+  bootstrap: () => Promise<void>
 }
 
-export const useAppStore = create<AppState>()(
-  devtools(
-    (set) => ({
-      user: null,
-      theme: 'light',
-      notifications: [],
+export const useAuthStore = create<AuthState>((set) => ({
+  token: localStorage.getItem(TOKEN_KEY),
+  user: null,
+  role: null,
+  loading: false,
+  error: null,
 
-      setUser: (user) => set({ user }),
+  login: async (username, password) => {
+    set({ loading: true, error: null })
+    try {
+      const token = await AuthAPI.login(username, password)
+      localStorage.setItem(TOKEN_KEY, token.access_token)
+      const user = await AuthAPI.me()
+      set({ token: token.access_token, user, role: token.role, loading: false })
+    } catch (err) {
+      set({ loading: false, error: 'Invalid username or password' })
+      throw err
+    }
+  },
 
-      setTheme: (theme) => {
-        set({ theme })
-        // TODO: Persist theme preference
-        localStorage.setItem('theme', theme)
-      },
+  logout: () => {
+    localStorage.removeItem(TOKEN_KEY)
+    set({ token: null, user: null, role: null })
+  },
 
-      addNotification: (notification) =>
-        set((state) => ({
-          notifications: [
-            ...state.notifications,
-            {
-              ...notification,
-              id: Math.random().toString(36).substr(2, 9),
-              timestamp: new Date(),
-            },
-          ],
-        })),
-
-      removeNotification: (id) =>
-        set((state) => ({
-          notifications: state.notifications.filter((n) => n.id !== id),
-        })),
-    }),
-    { name: 'AppStore' }
-  )
-)
+  bootstrap: async () => {
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (!token) return
+    try {
+      const user = await AuthAPI.me()
+      set({ token, user, role: user.role })
+    } catch {
+      localStorage.removeItem(TOKEN_KEY)
+      set({ token: null, user: null, role: null })
+    }
+  },
+}))

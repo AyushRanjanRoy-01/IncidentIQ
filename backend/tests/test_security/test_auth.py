@@ -1,42 +1,42 @@
-"""Tests for authentication and authorization."""
+"""Tests for authentication and authorization primitives."""
 
 import pytest
-from app.security.auth import AuthService, RBAC
+
+from app.core.exceptions import AuthenticationError
+from app.models.enums import UserRole, role_satisfies
+from app.security.auth import (
+    create_access_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
 
 
-def test_auth_service_initialization():
-    """Test auth service initialization."""
-    auth_service = AuthService()
-    assert auth_service is not None
+def test_password_hash_roundtrip():
+    hashed = hash_password("s3cret-pass")
+    assert hashed != "s3cret-pass"
+    assert verify_password("s3cret-pass", hashed) is True
+    assert verify_password("wrong", hashed) is False
 
 
-def test_create_access_token():
-    """Test JWT token creation."""
-    auth_service = AuthService(secret_key="test-secret-key")
-    token = auth_service.create_access_token(
-        subject="test-user",
-        roles=["admin"],
-    )
-    assert token is not None
-    assert isinstance(token, str)
+def test_password_hashes_are_salted():
+    assert hash_password("same") != hash_password("same")
 
 
-def test_decode_token():
-    """Test JWT token decoding."""
-    auth_service = AuthService(secret_key="test-secret-key")
-    token = auth_service.create_access_token(
-        subject="test-user",
-        roles=["admin"],
-    )
-    payload = auth_service.decode_token(token)
-    assert payload["sub"] == "test-user"
-    assert "admin" in payload["roles"]
+def test_jwt_roundtrip():
+    token, expires_in = create_access_token("alice", UserRole.OPERATOR.value)
+    assert expires_in > 0
+    payload = decode_token(token)
+    assert payload["sub"] == "alice"
+    assert payload["role"] == UserRole.OPERATOR.value
 
 
-def test_invalid_token():
-    """Test invalid token handling."""
-    auth_service = AuthService(secret_key="test-secret-key")
-    
-    with pytest.raises(Exception):  # TODO: Use specific exception
-        auth_service.decode_token("invalid-token")
+def test_invalid_token_raises():
+    with pytest.raises(AuthenticationError):
+        decode_token("not-a-real-token")
 
+
+def test_role_hierarchy():
+    assert role_satisfies(UserRole.ADMIN.value, UserRole.OPERATOR.value)
+    assert role_satisfies(UserRole.OPERATOR.value, UserRole.VIEWER.value)
+    assert not role_satisfies(UserRole.VIEWER.value, UserRole.OPERATOR.value)

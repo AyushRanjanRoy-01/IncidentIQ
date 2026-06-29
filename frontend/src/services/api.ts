@@ -1,79 +1,88 @@
 /**
- * API client service.
- * 
- * Provides centralized HTTP client with authentication,
- * error handling, and request/response interceptors.
+ * API client.
+ *
+ * Centralised axios instance with bearer-token auth + typed endpoint helpers.
+ * The base URL is relative by default so requests go through the Vite dev proxy
+ * (dev) or the nginx reverse proxy (prod). Override with VITE_API_BASE_URL.
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+import type {
+  Alert,
+  DashboardSummary,
+  Incident,
+  IncidentDetail,
+  KnowledgeResult,
+  Remediation,
+  Token,
+  User,
+} from '@/types'
 
-class ApiClient {
-  private client: AxiosInstance
+export const TOKEN_KEY = 'iq_token'
 
-  constructor() {
-    this.client = axios.create({
-      baseURL: API_BASE_URL,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      timeout: 30000,
-    })
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
-    this.setupInterceptors()
+export const http = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 30000,
+})
+
+http.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
   }
+  return config
+})
 
-  private setupInterceptors(): void {
-    // Request interceptor
-    this.client.interceptors.request.use(
-      (config) => {
-        // TODO: Add authentication token
-        const token = localStorage.getItem('auth_token')
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`
-        }
-        return config
-      },
-      (error) => {
-        return Promise.reject(error)
-      }
-    )
-
-    // Response interceptor
-    this.client.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        // TODO: Handle common errors (401, 403, 500, etc.)
-        if (error.response?.status === 401) {
-          // Handle unauthorized - redirect to login
-          localStorage.removeItem('auth_token')
-          window.location.href = '/login'
-        }
-        return Promise.reject(error)
-      }
-    )
+http.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem(TOKEN_KEY)
+    }
+    return Promise.reject(error)
   }
+)
 
-  async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-    return this.client.get<T>(url, config)
-  }
-
-  async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-    return this.client.post<T>(url, data, config)
-  }
-
-  async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-    return this.client.put<T>(url, data, config)
-  }
-
-  async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-    return this.client.delete<T>(url, config)
-  }
-
-  async patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-    return this.client.patch<T>(url, data, config)
-  }
+export const AuthAPI = {
+  login: (username: string, password: string) =>
+    http.post<Token>('/api/v1/auth/login', { username, password }).then((r) => r.data),
+  me: () => http.get<User>('/api/v1/auth/me').then((r) => r.data),
 }
 
-export const api = new ApiClient()
+export const AlertsAPI = {
+  list: (service?: string) =>
+    http.get<Alert[]>('/api/v1/alerts/', { params: { service } }).then((r) => r.data),
+  ingest: (payload: Partial<Alert>) =>
+    http.post('/api/v1/alerts/ingest', payload).then((r) => r.data),
+}
+
+export const IncidentsAPI = {
+  list: (status?: string) =>
+    http.get<Incident[]>('/api/v1/incidents/', { params: { status } }).then((r) => r.data),
+  get: (id: string) =>
+    http.get<IncidentDetail>(`/api/v1/incidents/${id}`).then((r) => r.data),
+  analyze: (id: string) =>
+    http.post<Incident>(`/api/v1/incidents/${id}/analyze`).then((r) => r.data),
+}
+
+export const RemediationAPI = {
+  approve: (id: string) =>
+    http.post<Remediation>(`/api/v1/remediation/${id}/approve`).then((r) => r.data),
+  reject: (id: string, reason: string) =>
+    http.post<Remediation>(`/api/v1/remediation/${id}/reject`, { reason }).then((r) => r.data),
+}
+
+export const StatsAPI = {
+  summary: () => http.get<DashboardSummary>('/api/v1/stats/summary').then((r) => r.data),
+}
+
+export const KnowledgeAPI = {
+  search: (query: string, top_k = 5) =>
+    http
+      .post<KnowledgeResult[]>('/api/v1/knowledge/search', { query, top_k })
+      .then((r) => r.data),
+}

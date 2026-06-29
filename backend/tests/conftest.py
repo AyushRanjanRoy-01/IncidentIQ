@@ -1,104 +1,91 @@
-"""Pytest configuration and fixtures.
+"""Pytest configuration and shared fixtures.
 
-Provides shared fixtures and configuration for all tests.
+Test environment is configured *before* importing the app so settings (cached at
+import) pick up a file-backed SQLite DB, the mock LLM provider, and JSON logging.
+Each test gets a freshly migrated schema, seeded demo users, and an indexed
+knowledge base, exercised through an httpx ASGI client.
 """
 
-import pytest
-import asyncio
-from typing import AsyncGenerator, Generator
-from fastapi.testclient import TestClient
-from app.main import app
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+# --- Configure environment BEFORE importing application modules ---
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./test_incidentiq.db")
+os.environ.setdefault("LOG_JSON", "true")
+os.environ.setdefault("LLM_PROVIDER", "mock")
+os.environ.setdefault("EMBEDDING_PROVIDER", "local")
+os.environ.setdefault("INTEGRATIONS_MOCK_MODE", "true")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret")
+
+import pytest  # noqa: E402
+import pytest_asyncio  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+
+from app.db.postgres import AsyncSessionLocal, drop_models, init_models  # noqa: E402
+from app.main import app  # noqa: E402
+from app.security.auth import seed_default_users  # noqa: E402
+from app.services.knowledge_service import KnowledgeService  # noqa: E402
+
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator:
-    """Create event loop for async tests."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+@pytest_asyncio.fixture
+async def db_session():
+    """Fresh schema + seeded users/knowledge; yields a session."""
+    await drop_models()
+    await init_models()
+    async with AsyncSessionLocal() as session:
+        await seed_default_users(session)
+        await KnowledgeService(session).index_directory(DATA_DIR)
+        await session.commit()
+        yield session
 
 
-@pytest.fixture
-def client() -> TestClient:
-    """Create test client for FastAPI app.
-    
-    Returns:
-        TestClient instance
-    """
-    return TestClient(app)
+@pytest_asyncio.fixture
+async def client(db_session):
+    """Async HTTP client bound to the app (schema already prepared)."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
 
 
-@pytest.fixture
-async def db_session() -> AsyncGenerator:
-    """Create database session for tests.
-    
-    Yields:
-        Database session
-    """
-    # TODO: Create test database session
-    # from app.db.postgres import get_db
-    # async with get_db() as session:
-    #     yield session
-    yield None
+async def _token(client: AsyncClient, username: str, password: str) -> str:
+    resp = await client.post(
+        "/api/v1/auth/login", json={"username": username, "password": password}
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()["access_token"]
 
 
-@pytest.fixture
-async def redis_client() -> AsyncGenerator:
-    """Create Redis client for tests.
-    
-    Yields:
-        Redis client
-    """
-    # TODO: Create test Redis client
-    # from app.db.redis import get_redis
-    # async with get_redis() as client:
-    #     yield client
-    yield None
+@pytest_asyncio.fixture
+async def operator_headers(client) -> dict[str, str]:
+    token = await _token(client, "operator", "operator123")
+    return {"Authorization": f"Bearer {token}"}
 
 
-@pytest.fixture
-def mock_llm_response() -> dict:
-    """Mock LLM API response.
-    
-    Returns:
-        Mock response dictionary
-    """
-    return {
-        "content": "Mock LLM response",
-        "tokens_used": 100,
-        "model": "gpt-4",
-    }
+@pytest_asyncio.fixture
+async def viewer_headers(client) -> dict[str, str]:
+    token = await _token(client, "viewer", "viewer123")
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def admin_headers(client) -> dict[str, str]:
+    token = await _token(client, "admin", "admin123")
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
 def sample_alert() -> dict:
-    """Sample alert data for tests.
-    
-    Returns:
-        Sample alert dictionary
-    """
     return {
         "alert_id": "test-alert-001",
-        "severity": "critical",
         "service": "checkout-api",
+        "severity": "critical",
         "metric": "api_latency_p95",
         "value": 2500,
         "threshold": 1000,
+        "labels": {"env": "production"},
     }
-
-
-@pytest.fixture
-def sample_incident() -> dict:
-    """Sample incident data for tests.
-    
-    Returns:
-        Sample incident dictionary
-    """
-    return {
-        "incident_id": "test-incident-001",
-        "title": "High API Latency",
-        "severity": "critical",
-        "status": "open",
-        "service": "checkout-api",
-    }
-

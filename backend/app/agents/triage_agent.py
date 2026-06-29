@@ -1,55 +1,55 @@
-"""Triage agent for alert filtering and deduplication.
+"""Triage agent for alert filtering and actionability assessment.
 
-Filters out noise, identifies duplicate alerts, and assesses
-severity and actionability.
+Deterministic, fast first pass: decides whether an alert is actionable, how
+urgent it is, and surfaces a dedup key. Runs with no LLM or network dependency.
 """
 
-from typing import Dict, Any, Optional
+from __future__ import annotations
+
+from typing import Any
+
+import structlog
+
 from app.agents.state import AgentState
+from app.models.enums import AlertSeverity
+
+logger = structlog.get_logger(__name__)
+
+# Severity -> urgency score.
+_URGENCY = {
+    AlertSeverity.CRITICAL.value: 1.0,
+    AlertSeverity.WARNING.value: 0.6,
+    AlertSeverity.INFO.value: 0.2,
+}
+
 
 class TriageAgent:
-    """Filters and deduplicates alerts."""
-    
-    def __init__(self) -> None:
-        """Initialize triage agent."""
-        # TODO: Load alert filtering rules
-        # TODO: Initialize duplicate detection model
-        pass
-    
-    async def triage(self, state: AgentState) -> Dict[str, Any]:
-        """Perform alert triage.
-        
-        Args:
-            state: Shared agent state
-            
-        Returns:
-            Triage result with actionability assessment
-        """
-        # TODO: Check for duplicate alerts
-        # TODO: Apply noise filtering rules
-        # TODO: Assess severity and actionability
-        pass
-    
-    async def is_duplicate(self, alert_id: str) -> bool:
-        """Check if alert is a duplicate of recent alerts.
-        
-        Args:
-            alert_id: ID of alert to check
-            
-        Returns:
-            True if duplicate, False otherwise
-        """
-        # TODO: Query alert history for similar alerts
-        pass
-    
-    async def is_noise(self, state: AgentState) -> bool:
-        """Determine if alert is noise.
-        
-        Args:
-            state: Shared agent state
-            
-        Returns:
-            True if alert is noise, False otherwise
-        """
-        # TODO: Apply noise filtering heuristics
-        pass
+    """Filters noise and assesses alert actionability."""
+
+    async def triage(self, state: AgentState) -> dict[str, Any]:
+        breach_ratio = 0.0
+        if state.threshold:
+            breach_ratio = round(state.value / state.threshold, 3)
+
+        # Info-severity alerts that only marginally breach the threshold are noise.
+        is_noise = state.severity == AlertSeverity.INFO.value and 0 < breach_ratio < 1.1
+        actionable = not is_noise
+        urgency = _URGENCY.get(state.severity, 0.5)
+
+        result = {
+            "actionable": actionable,
+            "is_noise": is_noise,
+            "urgency": urgency,
+            "breach_ratio": breach_ratio,
+            "dedup_key": f"{state.service}:{state.metric}:{state.labels.get('env', 'unknown')}",
+            "reason": (
+                "Low-severity alert within tolerance — likely noise."
+                if is_noise
+                else f"{state.severity} breach of {state.metric} "
+                f"({state.value} vs threshold {state.threshold})."
+            ),
+        }
+        state.triage_result = result
+        state.add_log("triage", result["reason"])
+        logger.info("agent.triage", incident_id=state.incident_id, actionable=actionable)
+        return result

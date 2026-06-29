@@ -1,37 +1,27 @@
 """Pod scaling action."""
 
-from typing import Dict, Any
+from __future__ import annotations
+
+from typing import Any
+
+from app.integrations.kubernetes import KubernetesClient
+
 
 class ScaleAction:
-    """Scales Kubernetes deployments."""
-    
-    def __init__(self) -> None:
-        """Initialize scale action."""
-        # TODO: Initialize Kubernetes client
-        pass
-    
-    async def execute(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute scaling.
-        
-        Args:
-            parameters: Action parameters including namespace, deployment, replicas
-            
-        Returns:
-            Execution result
-        """
-        # TODO: Call Kubernetes client to scale
-        # TODO: Return scale status
-        pass
-    
-    async def verify(self, parameters: Dict[str, Any]) -> bool:
-        """Verify scaling was successful.
-        
-        Args:
-            parameters: Action parameters
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        # TODO: Check pod count
-        # TODO: Verify metrics improving
-        pass
+    """Scales a service up or down."""
+
+    action_type = "scale"
+
+    def __init__(self, k8s: KubernetesClient) -> None:
+        self.k8s = k8s
+
+    async def execute(self, target: str, parameters: dict[str, Any]) -> dict[str, Any]:
+        return await self.k8s.scale(
+            service=target,
+            namespace=parameters.get("namespace", "production"),
+            replicas=parameters.get("replicas"),
+            replicas_delta=parameters.get("replicas_delta"),
+        )
+
+    async def verify(self, target: str, parameters: dict[str, Any]) -> bool:
+        return True
